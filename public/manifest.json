@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "YT Decks",
+  "version": "0.1.0",
+  "description": "Turn YouTube into a performance instrument",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://www.youtube.com/*", "https://youtube.com/*"],
+  "background": {
+    "service_worker": "src/extension/background.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://youtube.com/*"],
+      "js": ["src/extension/content.tsx"]
+    }
+  ],
+  "action": {
+    "default_popup": "src/extension/popup.html"
+  },
+  "commands": {
+    "toggle-overlay": {
+      "suggested_key": {
+        "default": "Alt+D"
+      },
+      "description": "Toggle YT Decks overlay"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
