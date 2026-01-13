@@ -1,7 +1,8 @@
 {
   "name": "yt-decks",
   "version": "1.0.0",
-  "description": "",
+  "description": "YouTube sample pad controller",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vite build --watch --mode development",
