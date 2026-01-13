@@ -8,9 +8,9 @@ interface OverlayHeaderProps {
 }
 
 const VIEW_TABS: { id: ActiveView; label: string }[] = [
-  { id: 'grid', label: 'Grid' },
+  { id: 'pads', label: 'Grid' },
   { id: 'mixer', label: 'Mixer' },
-  { id: 'effects', label: 'Effects' },
+  { id: 'settings', label: 'Effects' },
 ]
 
 export function OverlayHeader({ onMouseDown, onClose, onMinimize }: OverlayHeaderProps) {
