@@ -8,15 +8,24 @@ const KEYBOARD_SHORTCUT = { key: 'd', altKey: true }
 
 function App() {
   const toggleOverlay = useUIStore((state) => state.toggleOverlay)
+  const isVisible = useUIStore((state) => state.isOverlayVisible)
 
   useEffect(() => {
+    console.log('[YT Decks] App mounted, overlay visible:', isVisible)
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Log all key presses for debugging
+      if (e.altKey) {
+        console.log('[YT Decks] Alt key pressed with:', e.key)
+      }
+
       if (
         e.key.toLowerCase() === KEYBOARD_SHORTCUT.key &&
         e.altKey === KEYBOARD_SHORTCUT.altKey &&
         !e.ctrlKey &&
         !e.metaKey
       ) {
+        console.log('[YT Decks] Shortcut matched! Toggling overlay...')
         e.preventDefault()
         toggleOverlay()
       }
@@ -24,14 +33,17 @@ function App() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [toggleOverlay])
+  }, [toggleOverlay, isVisible])
 
   return <Overlay />
 }
 
 function init() {
+  console.log('[YT Decks] init() called')
+
   // Check if already initialized
   if (document.getElementById(CONTAINER_ID)) {
+    console.log('[YT Decks] Already initialized, skipping')
     return
   }
 
@@ -190,8 +202,14 @@ function getTailwindStyles(): string {
 }
 
 // Initialize when DOM is ready
+console.log('[YT Decks] Content script loaded, readyState:', document.readyState)
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init)
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[YT Decks] DOMContentLoaded, initializing...')
+    init()
+  })
 } else {
+  console.log('[YT Decks] DOM ready, initializing...')
   init()
 }
