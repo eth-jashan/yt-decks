@@ -1,26 +1,12 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import type { Pad, Bank, PadState as DomainPadState } from '../domain/types'
+import { createEmptyPads } from '../domain/helpers'
 
-export interface Pad {
-  id: string
-  position: number
-  source: {
-    videoId: string | null
-    startTime: number
-    endTime: number
-  }
-  playback: {
-    volume: number
-    speed: number
-    loop: boolean
-  }
-  state: 'idle' | 'playing' | 'loading' | 'error'
-}
-
-interface PadState {
+interface PadStoreState {
   pads: Pad[]
   activePadId: string | null
-  selectedBank: number
+  selectedBank: Bank
 }
 
 interface PadActions {
@@ -28,32 +14,17 @@ interface PadActions {
   updatePad: (id: string, updates: Partial<Pad>) => void
   triggerPad: (id: string) => void
   stopPad: (id: string) => void
-  setActiveBank: (bank: number) => void
+  setActiveBank: (bank: Bank) => void
+  setPadState: (id: string, state: DomainPadState) => void
 }
 
-const createEmptyPad = (position: number): Pad => ({
-  id: `pad-${position}`,
-  position,
-  source: {
-    videoId: null,
-    startTime: 0,
-    endTime: 0,
-  },
-  playback: {
-    volume: 1,
-    speed: 1,
-    loop: false,
-  },
-  state: 'idle',
-})
+const initialPads = createEmptyPads()
 
-const initialPads = Array.from({ length: 64 }, (_, i) => createEmptyPad(i))
-
-export const usePadStore = create<PadState & PadActions>()(
+export const usePadStore = create<PadStoreState & PadActions>()(
   immer((set) => ({
     pads: initialPads,
     activePadId: null,
-    selectedBank: 0,
+    selectedBank: 'A' as Bank,
 
     setPads: (pads) =>
       set((state) => {
@@ -72,8 +43,12 @@ export const usePadStore = create<PadState & PadActions>()(
       set((state) => {
         const padIndex = state.pads.findIndex((p) => p.id === id)
         if (padIndex !== -1) {
-          state.pads[padIndex].state = 'playing'
-          state.activePadId = id
+          // Only play pads that have content (not empty)
+          const pad = state.pads[padIndex]
+          if (pad.state !== 'empty') {
+            state.pads[padIndex].state = 'playing'
+            state.activePadId = id
+          }
         }
       }),
 
@@ -81,7 +56,9 @@ export const usePadStore = create<PadState & PadActions>()(
       set((state) => {
         const padIndex = state.pads.findIndex((p) => p.id === id)
         if (padIndex !== -1) {
-          state.pads[padIndex].state = 'idle'
+          const pad = state.pads[padIndex]
+          // Go back to ready state if pad has source, otherwise empty
+          state.pads[padIndex].state = pad.source ? 'ready' : 'empty'
           if (state.activePadId === id) {
             state.activePadId = null
           }
@@ -91,6 +68,14 @@ export const usePadStore = create<PadState & PadActions>()(
     setActiveBank: (bank) =>
       set((state) => {
         state.selectedBank = bank
+      }),
+
+    setPadState: (id, newState) =>
+      set((state) => {
+        const padIndex = state.pads.findIndex((p) => p.id === id)
+        if (padIndex !== -1) {
+          state.pads[padIndex].state = newState
+        }
       }),
   }))
 )
