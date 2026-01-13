@@ -249,8 +249,85 @@ export function usePadPlayback() {
     [pads, stopPad, updatePad]
   )
 
+  /**
+   * Load audio from a direct URL into a pad
+   */
+  const loadAudioUrl = useCallback(
+    async (padId: string, audioUrl: string, title: string = 'Audio Sample') => {
+      const pad = pads.find((p) => p.id === padId)
+      if (!pad) {
+        console.error('[usePadPlayback] Pad not found:', padId)
+        return false
+      }
+
+      // Set loading state
+      setPadState(padId, 'loading')
+
+      try {
+        // Initialize audio engine if needed
+        const engine = getAudioEngine()
+        if (!engine.isInitialized()) {
+          console.log('[usePadPlayback] Initializing audio engine...')
+          await engine.initialize()
+        }
+        await engine.resume()
+
+        // Fetch audio from URL
+        console.log('[usePadPlayback] Fetching audio from:', audioUrl)
+        const response = await fetch(audioUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`)
+        }
+
+        const arrayBuffer = await response.arrayBuffer()
+        console.log('[usePadPlayback] Fetched audio, size:', arrayBuffer.byteLength)
+
+        // Decode audio
+        console.log('[usePadPlayback] Decoding audio...')
+        const decodedBuffer = await engine.decodeAudioData(arrayBuffer)
+        console.log('[usePadPlayback] Decoded audio, duration:', decodedBuffer.duration)
+
+        // Store the buffer
+        setBuffer(padId, decodedBuffer)
+
+        // Update pad with metadata
+        updatePad(padId, {
+          source: {
+            type: 'audio-buffer',
+            youtubeId: null,
+            youtubeUrl: null,
+            title: title,
+            duration: decodedBuffer.duration,
+            thumbnail: null,
+          },
+          visual: {
+            ...pad.visual,
+            label: title.slice(0, 20),
+          },
+          playback: {
+            ...pad.playback,
+            outPoint: decodedBuffer.duration,
+          },
+          state: 'ready',
+        })
+
+        console.log('[usePadPlayback] Pad loaded successfully:', padId)
+        return true
+      } catch (error) {
+        console.error('[usePadPlayback] Failed to load audio:', error)
+        setPadState(padId, 'error')
+        updatePad(padId, {
+          errorMessage: error instanceof Error ? error.message : 'Failed to load audio',
+        })
+        return false
+      }
+    },
+    [pads, updatePad, setPadState, setBuffer]
+  )
+
   return {
     loadYouTube,
+    loadAudioUrl,
     playPad,
     stopPad,
     togglePad,
