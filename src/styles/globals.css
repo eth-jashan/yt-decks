@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #8B5CF6;
+  --color-secondary: #EC4899;
+  --color-background: #0F0F0F;
+  --color-surface: #1A1A1A;
+  --color-accent: #22D3EE;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-white;
+  }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+  }
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.5);
+  }
+}
