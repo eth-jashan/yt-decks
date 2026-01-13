@@ -1,6 +1,6 @@
 import React from 'react'
 import { useUIStore } from '../../stores'
-import { GridView } from '../GridView'
+import { PadGrid } from '../PadGrid'
 
 export function OverlayContent() {
   const activeView = useUIStore((state) => state.activeView)
@@ -8,7 +8,7 @@ export function OverlayContent() {
   const renderContent = () => {
     switch (activeView) {
       case 'pads':
-        return <GridView />
+        return <PadGrid />
       case 'mixer':
         return <PlaceholderView title="Mixer" />
       case 'settings':

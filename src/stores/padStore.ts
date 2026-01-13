@@ -14,6 +14,7 @@ interface PadActions {
   updatePad: (id: string, updates: Partial<Pad>) => void
   triggerPad: (id: string) => void
   stopPad: (id: string) => void
+  stopAllPads: () => void
   setActiveBank: (bank: Bank) => void
   setPadState: (id: string, state: DomainPadState) => void
 }
@@ -63,6 +64,16 @@ export const usePadStore = create<PadStoreState & PadActions>()(
             state.activePadId = null
           }
         }
+      }),
+
+    stopAllPads: () =>
+      set((state) => {
+        state.pads.forEach((pad) => {
+          if (pad.state === 'playing') {
+            pad.state = pad.source ? 'ready' : 'empty'
+          }
+        })
+        state.activePadId = null
       }),
 
     setActiveBank: (bank) =>
