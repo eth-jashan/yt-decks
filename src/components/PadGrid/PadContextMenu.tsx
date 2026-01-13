@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { usePadPlayback } from '../../hooks/usePadPlayback'
+import { YouTubeExtractor } from '../../services/YouTubeExtractor'
 import type { Pad } from '../../domain/types'
 
 interface PadContextMenuProps {
@@ -8,14 +9,14 @@ interface PadContextMenuProps {
   onClose: () => void
 }
 
-type InputMode = 'menu' | 'audio-url'
+type InputMode = 'menu' | 'youtube' | 'audio-url'
 
 // Inline styles for shadow DOM compatibility
 const styles = {
   menu: {
     position: 'fixed' as const,
     zIndex: 9999,
-    minWidth: '220px',
+    minWidth: '240px',
     backgroundColor: '#1f2937',
     border: '1px solid #374151',
     borderRadius: '8px',
@@ -109,7 +110,7 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { loadAudioUrl, clearPad } = usePadPlayback()
+  const { loadYouTube, loadAudioUrl, clearPad } = usePadPlayback()
 
   // Close on click outside
   useEffect(() => {
@@ -146,11 +147,53 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
     }
   }, [inputMode])
 
+  const handleLoadYouTube = useCallback(() => {
+    setInputMode('youtube')
+    setError(null)
+    setUrl('')
+  }, [])
+
   const handleLoadAudioUrl = useCallback(() => {
     setInputMode('audio-url')
     setError(null)
     setUrl('')
   }, [])
+
+  const handleSubmitYouTube = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (!url.trim()) {
+        setError('Please enter a YouTube URL')
+        return
+      }
+
+      if (!YouTubeExtractor.isValidInput(url)) {
+        setError('Invalid YouTube URL or video ID')
+        return
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        console.log('[PadContextMenu] Loading YouTube:', url)
+        const success = await loadYouTube(pad.id, url)
+        if (success) {
+          onClose()
+        } else {
+          setError('Failed to load - check console (F12)')
+        }
+      } catch (err) {
+        console.error('[PadContextMenu] Error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [url, pad.id, loadYouTube, onClose]
+  )
 
   const handleSubmitAudioUrl = useCallback(
     async (e: React.FormEvent) => {
@@ -162,7 +205,6 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
         return
       }
 
-      // Basic URL validation
       try {
         new URL(url)
       } catch {
@@ -179,7 +221,7 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
         if (success) {
           onClose()
         } else {
-          setError('Failed to load audio - check console for details')
+          setError('Failed to load - check console (F12)')
         }
       } catch (err) {
         console.error('[PadContextMenu] Error:', err)
@@ -191,11 +233,36 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
     [url, pad.id, loadAudioUrl, onClose]
   )
 
+  const handleLoadCurrentVideo = useCallback(async () => {
+    const currentUrl = window.location.href
+    if (!YouTubeExtractor.isValidInput(currentUrl)) {
+      setError('Not on a YouTube video page')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      console.log('[PadContextMenu] Loading current video:', currentUrl)
+      const success = await loadYouTube(pad.id, currentUrl)
+      if (success) {
+        onClose()
+      } else {
+        setError('Failed to load - check console (F12)')
+      }
+    } catch (err) {
+      console.error('[PadContextMenu] Error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [pad.id, loadYouTube, onClose])
+
   const handleLoadTestSample = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
-    // Use a CORS-friendly test audio
     const testUrl = 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'
 
     try {
@@ -220,22 +287,57 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
   }, [pad.id, clearPad, onClose])
 
   const hasContent = pad.source !== null
+  const isOnYouTube = typeof window !== 'undefined' && window.location.hostname.includes('youtube.com')
 
-  // Adjust position to stay within viewport
   const menuStyle = {
     ...styles.menu,
-    left: Math.min(position.x, window.innerWidth - 240),
-    top: Math.min(position.y, window.innerHeight - 200),
+    left: Math.min(position.x, window.innerWidth - 260),
+    top: Math.min(position.y, window.innerHeight - 250),
   }
 
-  return (
-    <div ref={menuRef} style={menuStyle}>
-      {/* URL Input Mode */}
-      {inputMode === 'audio-url' ? (
+  // Input forms
+  if (inputMode === 'youtube') {
+    return (
+      <div ref={menuRef} style={menuStyle}>
+        <form onSubmit={handleSubmitYouTube} style={{ padding: '12px' }}>
+          <label style={styles.label}>YouTube URL or Video ID</label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://youtube.com/watch?v=... or dQw4w9WgXcQ"
+            disabled={isLoading}
+            style={{ ...styles.input, opacity: isLoading ? 0.5 : 1 }}
+          />
+          {error && <p style={styles.error}>{error}</p>}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button
+              type="button"
+              onClick={() => { setInputMode('menu'); setError(null) }}
+              disabled={isLoading}
+              style={{ ...styles.button, ...styles.buttonSecondary, opacity: isLoading ? 0.5 : 1 }}
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{ ...styles.button, ...styles.buttonPrimary, opacity: isLoading ? 0.5 : 1 }}
+            >
+              {isLoading ? 'Loading...' : 'Load'}
+            </button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+
+  if (inputMode === 'audio-url') {
+    return (
+      <div ref={menuRef} style={menuStyle}>
         <form onSubmit={handleSubmitAudioUrl} style={{ padding: '12px' }}>
-          <label style={styles.label}>
-            Direct Audio URL (MP3, WAV, OGG)
-          </label>
+          <label style={styles.label}>Direct Audio URL (MP3, WAV, OGG)</label>
           <input
             ref={inputRef}
             type="text"
@@ -243,81 +345,107 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/audio.mp3"
             disabled={isLoading}
-            style={{
-              ...styles.input,
-              opacity: isLoading ? 0.5 : 1,
-            }}
+            style={{ ...styles.input, opacity: isLoading ? 0.5 : 1 }}
           />
           {error && <p style={styles.error}>{error}</p>}
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button
               type="button"
-              onClick={() => {
-                setInputMode('menu')
-                setError(null)
-              }}
+              onClick={() => { setInputMode('menu'); setError(null) }}
               disabled={isLoading}
-              style={{
-                ...styles.button,
-                ...styles.buttonSecondary,
-                opacity: isLoading ? 0.5 : 1,
-              }}
+              style={{ ...styles.button, ...styles.buttonSecondary, opacity: isLoading ? 0.5 : 1 }}
             >
               Back
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              style={{
-                ...styles.button,
-                ...styles.buttonPrimary,
-                opacity: isLoading ? 0.5 : 1,
-              }}
+              style={{ ...styles.button, ...styles.buttonPrimary, opacity: isLoading ? 0.5 : 1 }}
             >
               {isLoading ? 'Loading...' : 'Load'}
             </button>
           </div>
         </form>
-      ) : (
-        /* Menu Items */
-        <div style={{ padding: '4px 0' }}>
-          {/* Load test sample */}
+      </div>
+    )
+  }
+
+  // Main menu
+  return (
+    <div ref={menuRef} style={menuStyle}>
+      <div style={{ padding: '4px 0' }}>
+        {/* YouTube URL */}
+        <button
+          onClick={handleLoadYouTube}
+          disabled={isLoading}
+          onMouseEnter={() => setHoveredItem('youtube')}
+          onMouseLeave={() => setHoveredItem(null)}
+          style={{
+            ...styles.menuItem,
+            ...(hoveredItem === 'youtube' ? styles.menuItemHover : {}),
+            opacity: isLoading ? 0.5 : 1,
+          }}
+        >
+          <YouTubeIcon />
+          Load YouTube URL...
+        </button>
+
+        {/* Load current video (if on YouTube) */}
+        {isOnYouTube && (
           <button
-            onClick={handleLoadTestSample}
+            onClick={handleLoadCurrentVideo}
             disabled={isLoading}
-            onMouseEnter={() => setHoveredItem('test')}
+            onMouseEnter={() => setHoveredItem('current')}
             onMouseLeave={() => setHoveredItem(null)}
             style={{
               ...styles.menuItem,
-              ...(hoveredItem === 'test' ? styles.menuItemHover : {}),
+              ...(hoveredItem === 'current' ? styles.menuItemHover : {}),
               opacity: isLoading ? 0.5 : 1,
             }}
           >
-            <MusicIcon />
-            Load Test Sample
+            <DownloadIcon />
+            Load Current Video
           </button>
+        )}
 
-          {/* Load from audio URL */}
-          <button
-            onClick={handleLoadAudioUrl}
-            disabled={isLoading}
-            onMouseEnter={() => setHoveredItem('url')}
-            onMouseLeave={() => setHoveredItem(null)}
-            style={{
-              ...styles.menuItem,
-              ...(hoveredItem === 'url' ? styles.menuItemHover : {}),
-              opacity: isLoading ? 0.5 : 1,
-            }}
-          >
-            <LinkIcon />
-            Load Audio URL...
-          </button>
+        <div style={styles.divider} />
 
-          {/* Divider */}
-          {hasContent && <div style={styles.divider} />}
+        {/* Audio URL */}
+        <button
+          onClick={handleLoadAudioUrl}
+          disabled={isLoading}
+          onMouseEnter={() => setHoveredItem('url')}
+          onMouseLeave={() => setHoveredItem(null)}
+          style={{
+            ...styles.menuItem,
+            ...(hoveredItem === 'url' ? styles.menuItemHover : {}),
+            opacity: isLoading ? 0.5 : 1,
+          }}
+        >
+          <LinkIcon />
+          Load Audio URL...
+        </button>
 
-          {/* Clear pad */}
-          {hasContent && (
+        {/* Test sample */}
+        <button
+          onClick={handleLoadTestSample}
+          disabled={isLoading}
+          onMouseEnter={() => setHoveredItem('test')}
+          onMouseLeave={() => setHoveredItem(null)}
+          style={{
+            ...styles.menuItem,
+            ...(hoveredItem === 'test' ? styles.menuItemHover : {}),
+            opacity: isLoading ? 0.5 : 1,
+          }}
+        >
+          <MusicIcon />
+          Load Test Sample
+        </button>
+
+        {/* Clear pad */}
+        {hasContent && (
+          <>
+            <div style={styles.divider} />
             <button
               onClick={handleClear}
               disabled={isLoading}
@@ -333,24 +461,24 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
               <TrashIcon />
               Clear Pad
             </button>
-          )}
+          </>
+        )}
 
-          {/* Loading indicator */}
-          {isLoading && (
-            <div style={styles.loading}>
-              <LoadingSpinner />
-              Loading audio...
-            </div>
-          )}
+        {/* Loading indicator */}
+        {isLoading && (
+          <div style={styles.loading}>
+            <LoadingSpinner />
+            Loading audio...
+          </div>
+        )}
 
-          {/* Error */}
-          {error && (
-            <div style={{ ...styles.error, padding: '8px 14px' }}>
-              {error}
-            </div>
-          )}
-        </div>
-      )}
+        {/* Error */}
+        {error && (
+          <div style={{ ...styles.error, padding: '8px 14px' }}>
+            {error}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -358,19 +486,24 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
 function LoadingSpinner() {
   return (
     <svg style={{ ...styles.icon, animation: 'spin 1s linear infinite' }} fill="none" viewBox="0 0 24 24">
-      <circle
-        style={{ opacity: 0.25 }}
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        style={{ opacity: 0.75 }}
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
+      <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  )
+}
+
+function YouTubeIcon() {
+  return (
+    <svg style={{ ...styles.icon, color: '#ff0000' }} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    </svg>
+  )
+}
+
+function DownloadIcon() {
+  return (
+    <svg style={styles.icon} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
   )
 }

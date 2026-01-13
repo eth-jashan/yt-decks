@@ -3,6 +3,11 @@ import { usePadStore } from '../stores'
 import { useAudioBufferStore } from '../stores/audioBufferStore'
 import { getAudioEngine } from '../services/AudioEngine'
 import { YouTubeExtractor } from '../services/YouTubeExtractor'
+import {
+  extractYouTubeViaBackground,
+  base64ToArrayBuffer,
+  isBackgroundMessagingAvailable,
+} from '../services/backgroundMessaging'
 import type { Pad } from '../domain/types'
 
 /**
@@ -25,7 +30,7 @@ export function usePadPlayback() {
   const clearActiveVoice = useAudioBufferStore((state) => state.clearActiveVoice)
 
   /**
-   * Load a YouTube video into a pad
+   * Load a YouTube video into a pad via background script
    */
   const loadYouTube = useCallback(
     async (padId: string, youtubeUrl: string) => {
@@ -40,6 +45,15 @@ export function usePadPlayback() {
       if (!videoId) {
         console.error('[usePadPlayback] Invalid YouTube URL:', youtubeUrl)
         setPadState(padId, 'error')
+        updatePad(padId, { errorMessage: 'Invalid YouTube URL' })
+        return false
+      }
+
+      // Check if background messaging is available
+      if (!isBackgroundMessagingAvailable()) {
+        console.error('[usePadPlayback] Background messaging not available')
+        setPadState(padId, 'error')
+        updatePad(padId, { errorMessage: 'Extension not properly loaded. Try reloading the page.' })
         return false
       }
 
@@ -50,16 +64,24 @@ export function usePadPlayback() {
         // Initialize audio engine if needed
         const engine = getAudioEngine()
         if (!engine.isInitialized()) {
+          console.log('[usePadPlayback] Initializing audio engine...')
           await engine.initialize()
         }
+        await engine.resume()
 
-        // Extract audio from YouTube
-        console.log('[usePadPlayback] Extracting audio for pad:', padId)
-        const { metadata, audioBuffer } = await YouTubeExtractor.extract(youtubeUrl)
+        // Extract audio from YouTube via background script
+        console.log('[usePadPlayback] Extracting audio via background for:', videoId)
+        const { metadata, audioBase64 } = await extractYouTubeViaBackground(videoId)
+
+        // Convert base64 to ArrayBuffer
+        console.log('[usePadPlayback] Converting base64 to ArrayBuffer...')
+        const audioBuffer = base64ToArrayBuffer(audioBase64)
+        console.log('[usePadPlayback] Audio buffer size:', audioBuffer.byteLength)
 
         // Decode audio
         console.log('[usePadPlayback] Decoding audio...')
         const decodedBuffer = await engine.decodeAudioData(audioBuffer)
+        console.log('[usePadPlayback] Decoded audio, duration:', decodedBuffer.duration)
 
         // Store the buffer
         setBuffer(padId, decodedBuffer)

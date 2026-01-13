@@ -9,13 +9,19 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://youtube.com/*"
+    "https://youtube.com/*",
+    "https://api.cobalt.tools/*",
+    "https://*/*",
+    "http://*/*"
   ],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
       "matches": [
-        "https://www.youtube.com/*",
-        "https://youtube.com/*"
+        "<all_urls>"
       ],
       "js": ["dist/content.js"],
       "run_at": "document_idle"
