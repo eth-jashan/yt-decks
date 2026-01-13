@@ -1,7 +1,8 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { usePadStore } from '../stores'
 import { KEYBOARD_TO_PAD, isPadTriggerKey } from '../utils/keyboardMapping'
 import { PADS_PER_BANK, BANKS, type Bank } from '../domain'
+import { usePadPlayback } from './usePadPlayback'
 
 // Bank switching keys
 const BANK_KEYS: Record<string, Bank> = {
@@ -32,11 +33,15 @@ function isTypingInInput(): boolean {
  * Maps keyboard keys to pad indices and triggers playback
  */
 export function useKeyboardTriggers(enabled: boolean = true) {
-  const triggerPad = usePadStore((state) => state.triggerPad)
-  const stopPad = usePadStore((state) => state.stopPad)
   const pads = usePadStore((state) => state.pads)
   const selectedBank = usePadStore((state) => state.selectedBank)
   const setActiveBank = usePadStore((state) => state.setActiveBank)
+
+  const { togglePad } = usePadPlayback()
+
+  // Use ref to avoid stale closures
+  const togglePadRef = useRef(togglePad)
+  togglePadRef.current = togglePad
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -77,15 +82,11 @@ export function useKeyboardTriggers(enabled: boolean = true) {
         const pad = pads[globalPadIndex]
         if (!pad) return
 
-        // Toggle playback
-        if (pad.state === 'playing') {
-          stopPad(pad.id)
-        } else {
-          triggerPad(pad.id)
-        }
+        // Toggle playback with actual audio
+        togglePadRef.current(pad.id)
       }
     },
-    [pads, selectedBank, triggerPad, stopPad, setActiveBank]
+    [pads, selectedBank, setActiveBank]
   )
 
   useEffect(() => {

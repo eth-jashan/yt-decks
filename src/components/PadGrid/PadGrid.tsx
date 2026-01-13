@@ -1,18 +1,28 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import { usePadStore } from '../../stores'
 import { Pad } from '../Pad'
 import { BankSelector } from './BankSelector'
 import { GridControls } from './GridControls'
+import { PadContextMenu } from './PadContextMenu'
 import { useKeyboardTriggers } from '../../hooks/useKeyboardTriggers'
-import { getPadsForBank } from '../../domain'
+import { usePadPlayback } from '../../hooks/usePadPlayback'
+import { getPadsForBank, type Pad as PadType } from '../../domain'
 import { getKeyForPad } from '../../utils/keyboardMapping'
+
+interface ContextMenuState {
+  pad: PadType
+  position: { x: number; y: number }
+}
 
 export function PadGrid() {
   const pads = usePadStore((state) => state.pads)
   const selectedBank = usePadStore((state) => state.selectedBank)
-  const triggerPad = usePadStore((state) => state.triggerPad)
-  const stopPad = usePadStore((state) => state.stopPad)
   const activePadId = usePadStore((state) => state.activePadId)
+
+  const { togglePad, stopAll } = usePadPlayback()
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   // Enable keyboard triggers
   useKeyboardTriggers(true)
@@ -20,20 +30,27 @@ export function PadGrid() {
   // Get pads for the current bank (16 pads per bank)
   const bankPads = getPadsForBank(pads, selectedBank)
 
-  const handleTrigger = (padId: string) => {
-    const pad = pads.find((p) => p.id === padId)
-    if (pad?.state === 'playing') {
-      stopPad(padId)
-    } else {
-      triggerPad(padId)
-    }
-  }
+  const handleTrigger = useCallback(
+    (padId: string) => {
+      togglePad(padId)
+    },
+    [togglePad]
+  )
 
-  const handleContextMenu = (e: React.MouseEvent, padId: string) => {
-    e.preventDefault()
-    console.log('[YT Decks] Context menu for pad:', padId)
-    // TODO: Show context menu for pad configuration
-  }
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, pad: PadType) => {
+      e.preventDefault()
+      setContextMenu({
+        pad,
+        position: { x: e.clientX, y: e.clientY },
+      })
+    },
+    []
+  )
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
 
   return (
     <div className="flex flex-col h-full p-4 gap-4">
@@ -54,10 +71,19 @@ export function PadGrid() {
             isSelected={pad.id === activePadId}
             keyboardHint={getKeyForPad(localIndex)}
             onTrigger={() => handleTrigger(pad.id)}
-            onContextMenu={(e) => handleContextMenu(e, pad.id)}
+            onContextMenu={(e) => handleContextMenu(e, pad)}
           />
         ))}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <PadContextMenu
+          pad={contextMenu.pad}
+          position={contextMenu.position}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </div>
   )
 }

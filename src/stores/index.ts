@@ -9,3 +9,5 @@ export type { Channel } from './mixerStore'
 
 export { useUIStore } from './uiStore'
 export type { ActiveView } from './uiStore'
+
+export { useAudioBufferStore } from './audioBufferStore'
