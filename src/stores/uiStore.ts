@@ -30,7 +30,7 @@ interface UIActions {
 
 export const useUIStore = create<UIState & UIActions>()(
   immer((set) => ({
-    isOverlayVisible: false,
+    isOverlayVisible: true,
     overlayPosition: { x: 100, y: 100 },
     overlaySize: { width: 800, height: 600 },
     activeView: 'pads',
