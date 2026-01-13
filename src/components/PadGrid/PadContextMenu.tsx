@@ -10,11 +10,102 @@ interface PadContextMenuProps {
 
 type InputMode = 'menu' | 'audio-url'
 
+// Inline styles for shadow DOM compatibility
+const styles = {
+  menu: {
+    position: 'fixed' as const,
+    zIndex: 9999,
+    minWidth: '220px',
+    backgroundColor: '#1f2937',
+    border: '1px solid #374151',
+    borderRadius: '8px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+    overflow: 'hidden',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+  },
+  menuItem: {
+    width: '100%',
+    padding: '10px 14px',
+    textAlign: 'left' as const,
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#d1d5db',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s',
+  },
+  menuItemHover: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  menuItemDestructive: {
+    color: '#f87171',
+  },
+  input: {
+    width: '100%',
+    padding: '8px 12px',
+    backgroundColor: '#111827',
+    border: '1px solid #374151',
+    borderRadius: '6px',
+    color: 'white',
+    fontSize: '14px',
+    outline: 'none',
+  },
+  button: {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: '14px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s',
+  },
+  buttonPrimary: {
+    backgroundColor: '#7c3aed',
+    color: 'white',
+  },
+  buttonSecondary: {
+    backgroundColor: '#374151',
+    color: '#9ca3af',
+  },
+  label: {
+    display: 'block',
+    fontSize: '12px',
+    color: '#9ca3af',
+    marginBottom: '8px',
+  },
+  error: {
+    marginTop: '8px',
+    fontSize: '12px',
+    color: '#f87171',
+  },
+  loading: {
+    padding: '10px 14px',
+    fontSize: '12px',
+    color: '#9ca3af',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  divider: {
+    margin: '4px 0',
+    borderTop: '1px solid #374151',
+  },
+  icon: {
+    width: '16px',
+    height: '16px',
+    flexShrink: 0,
+  },
+}
+
 export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) {
   const [inputMode, setInputMode] = useState<InputMode>('menu')
   const [url, setUrl] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -64,6 +155,7 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
   const handleSubmitAudioUrl = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
+      e.stopPropagation()
 
       if (!url.trim()) {
         setError('Please enter an audio URL')
@@ -87,7 +179,7 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
         if (success) {
           onClose()
         } else {
-          setError('Failed to load audio')
+          setError('Failed to load audio - check console for details')
         }
       } catch (err) {
         console.error('[PadContextMenu] Error:', err)
@@ -103,16 +195,16 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
     setIsLoading(true)
     setError(null)
 
-    // Use a free sample audio for testing
-    const testUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+    // Use a CORS-friendly test audio
+    const testUrl = 'https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'
 
     try {
-      console.log('[PadContextMenu] Loading test sample')
-      const success = await loadAudioUrl(pad.id, testUrl, 'Test Sample')
+      console.log('[PadContextMenu] Loading test sample...')
+      const success = await loadAudioUrl(pad.id, testUrl, 'Test Sound')
       if (success) {
         onClose()
       } else {
-        setError('Failed to load test sample')
+        setError('Failed to load - check console (F12)')
       }
     } catch (err) {
       console.error('[PadContextMenu] Error:', err)
@@ -129,20 +221,20 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
 
   const hasContent = pad.source !== null
 
+  // Adjust position to stay within viewport
+  const menuStyle = {
+    ...styles.menu,
+    left: Math.min(position.x, window.innerWidth - 240),
+    top: Math.min(position.y, window.innerHeight - 200),
+  }
+
   return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[220px] bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
-      style={{
-        left: position.x,
-        top: position.y,
-      }}
-    >
+    <div ref={menuRef} style={menuStyle}>
       {/* URL Input Mode */}
       {inputMode === 'audio-url' ? (
-        <form onSubmit={handleSubmitAudioUrl} className="p-3">
-          <label className="block text-xs text-gray-400 mb-2">
-            Direct Audio URL (MP3, WAV, etc.)
+        <form onSubmit={handleSubmitAudioUrl} style={{ padding: '12px' }}>
+          <label style={styles.label}>
+            Direct Audio URL (MP3, WAV, OGG)
           </label>
           <input
             ref={inputRef}
@@ -151,12 +243,13 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/audio.mp3"
             disabled={isLoading}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+            style={{
+              ...styles.input,
+              opacity: isLoading ? 0.5 : 1,
+            }}
           />
-          {error && (
-            <p className="mt-2 text-xs text-red-400">{error}</p>
-          )}
-          <div className="flex gap-2 mt-3">
+          {error && <p style={styles.error}>{error}</p>}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button
               type="button"
               onClick={() => {
@@ -164,62 +257,87 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
                 setError(null)
               }}
               disabled={isLoading}
-              className="flex-1 px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-gray-800 rounded-md transition-colors disabled:opacity-50"
+              style={{
+                ...styles.button,
+                ...styles.buttonSecondary,
+                opacity: isLoading ? 0.5 : 1,
+              }}
             >
               Back
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="flex-1 px-3 py-1.5 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{
+                ...styles.button,
+                ...styles.buttonPrimary,
+                opacity: isLoading ? 0.5 : 1,
+              }}
             >
-              {isLoading ? (
-                <>
-                  <LoadingSpinner />
-                  Loading...
-                </>
-              ) : (
-                'Load'
-              )}
+              {isLoading ? 'Loading...' : 'Load'}
             </button>
           </div>
         </form>
       ) : (
         /* Menu Items */
-        <div className="py-1">
+        <div style={{ padding: '4px 0' }}>
           {/* Load test sample */}
-          <MenuItem
-            icon={<MusicIcon />}
-            label="Load Test Sample"
+          <button
             onClick={handleLoadTestSample}
             disabled={isLoading}
-          />
+            onMouseEnter={() => setHoveredItem('test')}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={{
+              ...styles.menuItem,
+              ...(hoveredItem === 'test' ? styles.menuItemHover : {}),
+              opacity: isLoading ? 0.5 : 1,
+            }}
+          >
+            <MusicIcon />
+            Load Test Sample
+          </button>
 
           {/* Load from audio URL */}
-          <MenuItem
-            icon={<LinkIcon />}
-            label="Load Audio URL..."
+          <button
             onClick={handleLoadAudioUrl}
             disabled={isLoading}
-          />
+            onMouseEnter={() => setHoveredItem('url')}
+            onMouseLeave={() => setHoveredItem(null)}
+            style={{
+              ...styles.menuItem,
+              ...(hoveredItem === 'url' ? styles.menuItemHover : {}),
+              opacity: isLoading ? 0.5 : 1,
+            }}
+          >
+            <LinkIcon />
+            Load Audio URL...
+          </button>
 
           {/* Divider */}
-          {hasContent && <div className="my-1 border-t border-gray-700" />}
+          {hasContent && <div style={styles.divider} />}
 
           {/* Clear pad */}
           {hasContent && (
-            <MenuItem
-              icon={<TrashIcon />}
-              label="Clear Pad"
+            <button
               onClick={handleClear}
               disabled={isLoading}
-              destructive
-            />
+              onMouseEnter={() => setHoveredItem('clear')}
+              onMouseLeave={() => setHoveredItem(null)}
+              style={{
+                ...styles.menuItem,
+                ...styles.menuItemDestructive,
+                ...(hoveredItem === 'clear' ? { backgroundColor: 'rgba(239,68,68,0.2)' } : {}),
+                opacity: isLoading ? 0.5 : 1,
+              }}
+            >
+              <TrashIcon />
+              Clear Pad
+            </button>
           )}
 
           {/* Loading indicator */}
           {isLoading && (
-            <div className="px-3 py-2 text-xs text-gray-400 flex items-center gap-2">
+            <div style={styles.loading}>
               <LoadingSpinner />
               Loading audio...
             </div>
@@ -227,7 +345,7 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
 
           {/* Error */}
           {error && (
-            <div className="px-3 py-2 text-xs text-red-400">
+            <div style={{ ...styles.error, padding: '8px 14px' }}>
               {error}
             </div>
           )}
@@ -237,39 +355,11 @@ export function PadContextMenu({ pad, position, onClose }: PadContextMenuProps) 
   )
 }
 
-interface MenuItemProps {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  destructive?: boolean
-}
-
-function MenuItem({ icon, label, onClick, disabled, destructive }: MenuItemProps) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        w-full px-3 py-2 text-left text-sm flex items-center gap-3
-        transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-        ${destructive
-          ? 'text-red-400 hover:bg-red-500/20'
-          : 'text-gray-300 hover:bg-white/10 hover:text-white'
-        }
-      `}
-    >
-      <span className="w-4 h-4">{icon}</span>
-      {label}
-    </button>
-  )
-}
-
 function LoadingSpinner() {
   return (
-    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+    <svg style={{ ...styles.icon, animation: 'spin 1s linear infinite' }} fill="none" viewBox="0 0 24 24">
       <circle
-        className="opacity-25"
+        style={{ opacity: 0.25 }}
         cx="12"
         cy="12"
         r="10"
@@ -277,7 +367,7 @@ function LoadingSpinner() {
         strokeWidth="4"
       />
       <path
-        className="opacity-75"
+        style={{ opacity: 0.75 }}
         fill="currentColor"
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
       />
@@ -287,7 +377,7 @@ function LoadingSpinner() {
 
 function MusicIcon() {
   return (
-    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <svg style={styles.icon} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
     </svg>
   )
@@ -295,7 +385,7 @@ function MusicIcon() {
 
 function LinkIcon() {
   return (
-    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <svg style={styles.icon} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
     </svg>
   )
@@ -303,7 +393,7 @@ function LinkIcon() {
 
 function TrashIcon() {
   return (
-    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <svg style={styles.icon} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   )
