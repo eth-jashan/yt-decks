@@ -1,0 +1,168 @@
+/* YT Decks Global Styles */
+
+:root {
+  --color-primary: #8B5CF6;
+  --color-primary-light: #A78BFA;
+  --color-primary-dark: #7C3AED;
+  --color-bg-dark: #0F0F0F;
+  --color-bg-card: #1a1a1a;
+  --color-bg-hover: #252525;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-text: #FFFFFF;
+  --color-text-muted: rgba(255, 255, 255, 0.6);
+}
+
+/* Pad Animations */
+
+.pad-playing {
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+.pad-queued {
+  animation: blink-border 0.5s ease-in-out infinite;
+}
+
+.pad-loader {
+  animation: fade-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 10px var(--pad-color, var(--color-primary)),
+      inset 0 0 5px rgba(139, 92, 246, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 25px var(--pad-color, var(--color-primary)),
+      0 0 40px var(--pad-color, var(--color-primary)),
+      inset 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+}
+
+@keyframes blink-border {
+  0%, 100% {
+    border-color: rgba(234, 179, 8, 0.7);
+    box-shadow: 0 0 8px rgba(234, 179, 8, 0.3);
+  }
+  50% {
+    border-color: rgba(234, 179, 8, 0.3);
+    box-shadow: 0 0 2px rgba(234, 179, 8, 0.1);
+  }
+}
+
+@keyframes fade-pulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Pad Grid */
+
+.pad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+/* Waveform visualization */
+
+.waveform-container {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  height: 20px;
+  opacity: 0.6;
+  overflow: hidden;
+}
+
+.waveform-bar {
+  display: inline-block;
+  width: 2px;
+  margin-right: 1px;
+  background: linear-gradient(to top, var(--color-primary), var(--color-primary-light));
+  border-radius: 1px;
+  transform-origin: bottom;
+}
+
+/* Progress bar animation for playing state */
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.progress-playing {
+  background: linear-gradient(
+    90deg,
+    var(--pad-color) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    var(--pad-color) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Utility classes */
+
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* Custom scrollbar */
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Focus visible styles */
+
+.focus-ring:focus-visible {
+  outline: none;
+  ring: 2px solid var(--color-primary);
+  ring-offset: 2px;
+  ring-offset-color: var(--color-bg-dark);
+}
+
+/* Transitions */
+
+.transition-fast {
+  transition: all 100ms ease-out;
+}
+
+.transition-normal {
+  transition: all 150ms ease-out;
+}
+
+.transition-slow {
+  transition: all 300ms ease-out;
+}
